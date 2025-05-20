@@ -21,6 +21,8 @@ class WorkerAgent(RoutedAgent):
     The user has submitted a request for a new feature. 
     The Manager agent requires your help. 
     Answer any questions from the Manager agent.
+    The last assistant message will contain a question from the Manager. 
+    
     """
 
     def __init__(
@@ -46,20 +48,31 @@ class WorkerAgent(RoutedAgent):
                 await self._message_store.add_worker_message(
                     context_message, self._name
                 )
+        await self._message_store.add_worker_message(message.message, self._name)
 
         messages_history = await self._message_store.get_worker_messages(self._name)
         logger.info(f"Retrieved worker messages: {messages_history}")
         system_message = SystemMessage(content=self.QUESTION_SYSTEM_PROMPT)
 
-        input_messages = [system_message] + list(messages_history) + [message.message]
+        input_messages = (
+            [system_message]
+            + list(messages_history)
+            + [SystemMessage(content="Worker, give your answer:"), message.message]
+        )
 
         llm_result = await self._model_client.create(
             messages=input_messages,
             cancellation_token=ctx.cancellation_token,
         )
         logger.info(f"Worker LLM response: {llm_result}. Content: {llm_result.content}")
+        assistant_message = AssistantMessage(
+            content=f"Worker agent {self._name}: {llm_result.content}",
+            source=self.id.key,
+        )
+        await self._message_store.add_worker_message(assistant_message, self._name)
+        await self._message_store.add_public_message(assistant_message)
         response = ResponseMessage(
-            message=AssistantMessage(content=llm_result.content, source=self.id.key)
+            message=assistant_message, is_round_question=message.is_round_question
         )
 
         await self.publish_message(

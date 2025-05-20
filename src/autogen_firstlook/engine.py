@@ -10,7 +10,11 @@ from autogen_core import (
     TopicId,
     TypeSubscription,
 )
-from autogen_firstlook.communication.topics import USER_TOPIC, MANAGER_TOPIC
+from autogen_firstlook.communication.topics import (
+    USER_TOPIC,
+    MANAGER_TOPIC,
+    WORKER_TOPIC,
+)
 
 
 class Engine:
@@ -31,6 +35,9 @@ class Engine:
             factory=self.agent_factory.create_manager_factory(self.worker_names),
         )
         await runtime.add_subscription(TypeSubscription(USER_TOPIC, manager_agent_type))
+        await runtime.add_subscription(
+            TypeSubscription(WORKER_TOPIC, manager_agent_type)
+        )
 
         for worker_name in self.worker_names:
             worker_agent_type = await WorkerAgent.register(
